@@ -70,6 +70,7 @@ class Application(tk.Frame):
         # Release the camera and close the window
         self.cap.release()
         self.root.destroy()
+        sys.exit(0)
 
     ########################################################################################
     # Start the mainloop
