@@ -97,9 +97,18 @@ class Application(tk.Frame):
             # Cut off edeges of the image
             gray = gray[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
             
+            # Apply median filter
+            median = cv2.medianBlur(gray,3)
+ 
+            # Apply Gaussian filter
+            gaussian = cv2.GaussianBlur(median,(5,5),0)
+
             # Addaptive thresholding
-            thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            thresh = cv2.adaptiveThreshold(gaussian, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
+            
+
+
             cv2.imshow("Thresholded", thresh)
             cv2.waitKey(0)
             cv2.destroyAllWindows()
