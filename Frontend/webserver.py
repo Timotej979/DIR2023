@@ -65,7 +65,7 @@ class WebService():
             raise web.HTTPInternalServerError("!! POST /pack_object failed !!")
 
     # Stop
-    @routes.post('/stop')
+    @routes.post('/stop_robot')
     async def stop(request):
         log.info("## Stop function called ##")
         try:

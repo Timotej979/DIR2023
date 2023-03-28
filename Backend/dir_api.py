@@ -72,15 +72,15 @@ class API_Server():
             raise web.HTTPInternalServerError("!! GET /pack_object failed !!")
         
     
-    @routes.get('/stop')
+    @routes.get('/stop_robot')
     async def stop(request):
         log.info("## Stop function called ##")
         #TODO insert code from nativeApp/main.py and generate a status response, so either 200 or 500
         try:
             if nativeApp_DAL.stop() == True:
-                return web.json_response({"status": 200, "messsage": "GET /stop successfull"})
+                return web.json_response({"status": 200, "messsage": "GET /stop_robot successfull"})
             else:
-                return web.json_response({"status": 500, "messsage": "GET /stop failed in DAL"})
+                return web.json_response({"status": 500, "messsage": "GET /stop_robot failed in DAL"})
         except:
             raise web.HTTPInternalServerError("!! GET /stop failed !!")
     

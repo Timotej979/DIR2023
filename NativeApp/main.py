@@ -48,7 +48,7 @@ class Application(tk.Frame):
         self.button4.place(x=400, y=100)
         self.button4.pack()
         # Bind the button to the stop function
-        self.button4.bind("<Button-1>", self.stop)
+        self.button4.bind("<Button-1>", self.stop_robot)
 
         self.button5 = tk.Button(self.root, text="Scan QR")
         self.button5.place(x=500, y=100)
@@ -155,7 +155,7 @@ class Application(tk.Frame):
 
 
 
-    def stop(self, event):
+    def stop_robot(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
 
     def scan_qr(self, event):
