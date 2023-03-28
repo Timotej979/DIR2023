@@ -36,19 +36,25 @@ class Application(tk.Frame):
         self.button2.place(x=200, y=100)
         self.button2.pack()
         # Bind the button to the insert_object function
-        self.button2.bind("<Button-2>", self.insert_object)
+        self.button2.bind("<Button-1>", self.insert_object)
 
         self.button3 = tk.Button(self.root, text="Pack object")
         self.button3.place(x=300, y=100)
         self.button3.pack()
         # Bind the button to the pack_object function
-        self.button3.bind("<Button-3>", self.pack_object)
+        self.button3.bind("<Button-1>", self.pack_object)
 
         self.button4 = tk.Button(self.root, text="STOP")
         self.button4.place(x=400, y=100)
         self.button4.pack()
         # Bind the button to the stop function
-        self.button4.bind("<Button-4>", self.stop)
+        self.button4.bind("<Button-1>", self.stop)
+
+        self.button5 = tk.Button(self.root, text="Scan QR")
+        self.button5.place(x=500, y=100)
+        self.button5.pack()
+        # Bind the button to the stop function
+        self.button5.bind("<Button-1>", self.scan_qr)
 
         # Open the webcam
         self.cap = cv2.VideoCapture(0)
@@ -112,6 +118,16 @@ class Application(tk.Frame):
 
     def stop(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
+
+    def scan_qr(self, event):
+        detect = cv2.QRCodeDetector()
+        _, frame = self.cap.read()
+        try:
+            value, points, straight_qrcode = detect.detectAndDecode(frame)
+            print(value)
+        except:
+            print("Scan failed")
+
     
 
 if __name__ == "__main__":
