@@ -91,11 +91,8 @@ class Application(tk.Frame):
             # Cut off edeges of the image
             gray = gray[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
             
-            # Blur the image
-            gray = cv2.GaussianBlur(gray, (3, 3), 0)
-
-            # Threshold the image
-            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+            # Addaptive thresholding
+            thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
             
             cv2.imshow("Thresholded", thresh)
             cv2.waitKey(0)
