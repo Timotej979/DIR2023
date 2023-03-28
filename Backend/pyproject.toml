@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "DIR2023-API"
+version = "1.0"
+description = "REST API for DIR2023 hackaton"
+authors = ["Timotej979"]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.11"
+
+SQLAlchemy = "^1.4.39"
+
+asyncio = "^3.4.3"
+asyncpg = "^0.26.0"
+aiohttp = "^3.8.1"
+aiohttp-sqlalchemy = "^0.34.0"
+
+numpy = "^1.17.3"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
