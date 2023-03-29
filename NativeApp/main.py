@@ -49,7 +49,7 @@ class Application(tk.Frame):
         # Bind the button to the pack_object function
         self.button3.bind("<Button-1>", self.pack_object)
 
-        self.button4 = tk.Button(self.root, text="STOP")
+        self.button4 = tk.Button(self.root, text="Stop robot")
         self.button4.place(x=400, y=100)
         self.button4.pack()
         # Bind the button to the stop function
@@ -65,11 +65,21 @@ class Application(tk.Frame):
         # Position GUI elements
         # Zero top left corner is about 50 pixels down and 250 pixels right
         self.canvas.create_text(230, 30, text="ROBOTIC SORTER AND PACKER", font=("Arial", 20))
-        self.canvas.create_window(80, 70, window=self.button1)
-        self.canvas.create_window(80, 110, window=self.button2)
-        self.canvas.create_window(80, 150, window=self.button3)
-        self.canvas.create_window(80, 190, window=self.button4)
-        self.canvas.create_window(80, 230, window=self.button5)
+
+        self.canvas.create_text(150, 80, text="Find objects using CV and set\nthem to respected starting positions", font=("Arial", 12))
+        self.canvas.create_window(80, 120, window=self.button1)
+
+        self.canvas.create_text(110, 160, text="Insert object into the box", font=("Arial", 12))
+        self.canvas.create_window(80, 190, window=self.button2)
+
+        self.canvas.create_text(65, 230, text="Pack object", font=("Arial", 12))
+        self.canvas.create_window(78, 260, window=self.button3)
+
+        self.canvas.create_text(70, 300, text="Stop the robot", font=("Arial", 12))
+        self.canvas.create_window(72, 330, window=self.button4)
+        
+        self.canvas.create_text(70, 370, text="Scan QR code", font=("Arial", 12))
+        self.canvas.create_window(70, 400, window=self.button5)
 
         # Open the webcam
         self.cap = cv2.VideoCapture(0)
@@ -111,7 +121,9 @@ class Application(tk.Frame):
             # Cut off edeges of the image
             frame = frame[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
 
-            edges = cv2.Canny(frame, 100, 200)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            edges = cv2.Canny(gray, 100, 200, apertureSize=5, L2gradient = False)
 
             # Find contours 
             contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
@@ -122,9 +134,7 @@ class Application(tk.Frame):
             cv2.drawContours(frame, [sorted_contours[0], sorted_contours[1]], -1, (0, 255, 0), 3)
 
             cv2.imshow("Frame", frame)
-            cv2.imshow("Edges", edges)
             cv2.waitKey(0)
-
 
             
 
@@ -144,14 +154,31 @@ class Application(tk.Frame):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
 
     def scan_qr(self, event):
-        detect = cv2.QRCodeDetector()
-        _, frame = self.cap.read()
-        try:
-            value, points, straight_qrcode = detect.detectAndDecode(frame)
-            print(value)
-        except:
-            print("Scan failed")
+        
+        ret, frame = self.cap.read()
+        
+        if ret == True:
 
+            # Cut off edeges of the image
+            frame = frame[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
+
+            # Convert from BGR to RGB
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            try:
+                # Initialize QR code detector
+                qr_reader = cv2.QRCodeDetector()
+
+                # Decode the QR code
+                data, bbox, rectified_image = qr_reader.detectAndDecode(img)
+
+                print(data)
+
+            except:
+                print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Scan failed")
+
+        else:
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Couldn't read frame")
     
 
 if __name__ == "__main__":
