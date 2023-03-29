@@ -1,8 +1,10 @@
-import cv2, time, sys, os
+import cv2, time, sys, os, csv
 
 import tkinter as tk
+from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
+from pyzbar.pyzbar import decode
 from PIL import Image, ImageTk
 from dotenv import load_dotenv
 
@@ -18,6 +20,28 @@ END_CUT_IMAGE_X = int(os.getenv("END_CUT_IMAGE_X"))
 END_CUT_IMAGE_Y = int(os.getenv("END_CUT_IMAGE_Y"))
 
 
+# Console class for logging
+class Console(tk.Text):
+    def __init__(self, *args, **kwargs):
+        kwargs.update({"state": "disabled"})
+        tk.Text.__init__(self, *args, **kwargs)
+        self.bind("<Destroy>", self.reset)
+        self.old_stdout = sys.stdout
+        sys.stdout = self
+    
+    def delete(self, *args, **kwargs):
+        self.config(state="normal")
+        self.delete(*args, **kwargs)
+        self.config(state="disabled")
+    
+    def write(self, content):
+        self.config(state="normal")
+        self.insert("end", content)
+        self.config(state="disabled")
+    
+    def reset(self, event):
+        sys.stdout = self.old_stdout
+
 # Application class
 class Application(tk.Frame):
     def __init__(self):
@@ -25,7 +49,7 @@ class Application(tk.Frame):
         self.root.title("Robotic sorter and packer")
         
         # Create canvas
-        self.canvas = tk.Canvas(self.root, width=1100, height=540)
+        self.canvas = tk.Canvas(self.root, width=1400, height=600)
         self.canvas.pack()
 
         ########################################################################################
@@ -61,6 +85,11 @@ class Application(tk.Frame):
         # Bind the button to the stop function
         self.button5.bind("<Button-1>", self.scan_qr)
 
+        # Scrolled text command widget
+        self.log_widget = Console(self.root, height=9, width=70, font=("Arial", "8"))
+        self.log_widget.pack()
+       
+
         ########################################################################################
         # Position GUI elements
         # Zero top left corner is about 50 pixels down and 250 pixels right
@@ -81,12 +110,17 @@ class Application(tk.Frame):
         self.canvas.create_text(70, 370, text="Scan QR code", font=("Arial", 12))
         self.canvas.create_window(70, 400, window=self.button5)
 
+        self.log_widget.place(x=10, y=440)
+
         # Open the webcam
         self.cap = cv2.VideoCapture(0)
+        self.cap.set(3, 1920) # Width
+        self.cap.set(4, 1080) # Height
 
         # Check if the webcam is opened correctly
         if not self.cap.isOpened():
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Cannot open webcam")
+            self.update_label()
             sys.exit(1)
 
         self.mainloop()
@@ -97,14 +131,20 @@ class Application(tk.Frame):
         self.root.destroy()
         sys.exit(0)
 
+
     ########################################################################################
     # Start the mainloop
     def mainloop(self):
         while True:
             _, frame = self.cap.read()
-            frame = cv2.flip(frame, 1)
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-            img = Image.fromarray(cv2image)
+            
+            # Resize image
+            width, height = cv2image.shape[:2]
+            resized_image = cv2.resize(cv2image, (int(width/2), int(height/2)))
+            
+            img = Image.fromarray(resized_image)
             imgtk = ImageTk.PhotoImage(image=img)
             self.canvas.create_image(450, 30, image=imgtk, anchor=tk.NW)
             self.root.update()   
@@ -113,6 +153,7 @@ class Application(tk.Frame):
     # Button functions
     def find_objects(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding objects")
+        self.update_label()
 
         ret, frame = self.cap.read()
         
@@ -123,15 +164,18 @@ class Application(tk.Frame):
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-            edges = cv2.Canny(gray, 100, 200, apertureSize=5, L2gradient = False)
+            edges = cv2.Canny(gray, 100, 200, apertureSize=7, L2gradient = False)
 
             # Find contours 
             contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
 
             sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
+            packaging_contour = sorted_contours[0]
+            counter_contour = sorted_contours[2]
+
             # Draw all contours
-            cv2.drawContours(frame, [sorted_contours[0], sorted_contours[1]], -1, (0, 255, 0), 3)
+            cv2.drawContours(frame, [packaging_contour, counter_contour], -1, (0, 255, 0), 3)
 
             cv2.imshow("Frame", frame)
             cv2.waitKey(0)
@@ -153,6 +197,7 @@ class Application(tk.Frame):
     def stop_robot(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
 
+
     def scan_qr(self, event):
         
         ret, frame = self.cap.read()
@@ -162,25 +207,33 @@ class Application(tk.Frame):
             # Cut off edeges of the image
             frame = frame[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
 
-            # Convert from BGR to RGB
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             try:
-                # Initialize QR code detector
-                qr_reader = cv2.QRCodeDetector()
+                # Find QR code
+                data, bbox, rectifiedImage = cv2.QRCodeDetector().detectAndDecode(frame)
+                
+                if len(data) > 0:
+                    print("Decoded Data : {}".format(data))
 
-                # Decode the QR code
-                data, bbox, rectified_image = qr_reader.detectAndDecode(img)
+                    with open('NativeApp/data.csv', 'w', newline='') as csvfile:
+                        writer = csv.writer(csvfile, delimiter=',')
 
-                print(data)
+                        writer.writerow(["QR-code", str(data)])
 
-            except:
+
+                else:
+                    print("QR Code not detected")
+
+            except Exception as e:
                 print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Scan failed")
+                print(e)
 
         else:
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Couldn't read frame")
     
 
+    
+
+##########################################################################################################################################
 if __name__ == "__main__":
 
     if OPERATION_MODE == 'dev':
