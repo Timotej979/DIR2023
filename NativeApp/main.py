@@ -67,6 +67,14 @@ class Application(tk.Frame):
         # Bind the button to the insert_object function
         self.button2.bind("<Button-1>", self.insert_object)
 
+        # Create a drop down menu
+        self.packing_string = tk.StringVar(self.root)
+        self.packing_string.set("X") # default value
+        self.options = ["X", "Y", "Z"]
+
+        self.drop_down = tk.OptionMenu(self.root, self.packing_string, *self.options)
+        self.drop_down.pack()
+
         self.button3 = tk.Button(self.root, text="Pack object")
         self.button3.place(x=300, y=100)
         self.button3.pack()
@@ -102,7 +110,7 @@ class Application(tk.Frame):
         self.canvas.create_window(80, 190, window=self.button2)
 
         self.canvas.create_text(65, 230, text="Pack object", font=("Arial", 12))
-        self.canvas.create_window(78, 260, window=self.button3)
+        self.canvas.create_window(152, 260, window=self.button3)
 
         self.canvas.create_text(70, 300, text="Stop the robot", font=("Arial", 12))
         self.canvas.create_window(72, 330, window=self.button4)
@@ -111,6 +119,8 @@ class Application(tk.Frame):
         self.canvas.create_window(70, 400, window=self.button5)
 
         self.log_widget.place(x=10, y=440)
+
+        self.drop_down.place(x=20, y=242)
 
         # Open the webcam
         self.cap = cv2.VideoCapture(0)
