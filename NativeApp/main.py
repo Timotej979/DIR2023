@@ -153,7 +153,6 @@ class Application(tk.Frame):
     # Button functions
     def find_objects(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding objects")
-        self.update_label()
 
         ret, frame = self.cap.read()
         
@@ -212,7 +211,7 @@ class Application(tk.Frame):
                 data, bbox, rectifiedImage = cv2.QRCodeDetector().detectAndDecode(frame)
                 
                 if len(data) > 0:
-                    print("Decoded Data : {}".format(data))
+                    print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Decoded Data : {}".format(data))
 
                     with open('NativeApp/data.csv', 'w', newline='') as csvfile:
                         writer = csv.writer(csvfile, delimiter=',')
@@ -221,7 +220,7 @@ class Application(tk.Frame):
 
 
                 else:
-                    print("QR Code not detected")
+                    print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "QR Code not detected")
 
             except Exception as e:
                 print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Scan failed")
