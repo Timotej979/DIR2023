@@ -25,8 +25,8 @@ ZAPOREDJE_TOCK_SKATLJA = [
     'suction_on',
     'Skatlja_pobiranje_zgoraj_po',
     'Skatlja_prehodna',
-    'Skatlja_odpiranje_zacetek',
-    'Skatlja_odpiranje_spodaj',
+    #'Skatlja_odpiranje_zacetek',
+    #'Skatlja_odpiranje_spodaj',
     'Skatlja_odpiranje_posevno',
     'Skatlja_odpiranje_posevno_popravek',
     'Skatlja_odpiranje_konec',
@@ -47,7 +47,7 @@ ZAPOREDJE_TOCK_STEVEC = [
     'suction_on',
     'Pobiranje_stevca_zgoraj',
     'Stevec_prehodna',
-    'Stevec_prehodna_rotiran',
+    #'Stevec_prehodna_rotiran',
     'Stevec_vstavljanje_pred',
     'Stevec_vstavljanje_spust',
     'suction_off',
@@ -220,6 +220,12 @@ class Application(tk.Frame):
         # Bind the button to the stop function
         self.button5.bind("<Button-1>", self.scan_qr)
 
+        self.button6 = tk.Button(self.root, text="Grab detected object")
+        self.button6.place(x=600, y=100)
+        self.button6.pack()
+        # Bind the button to the grab function
+        self.button6.bind("<Button-1>", self.grab_object)
+
         # Scrolled text command widget
         self.log_widget = Console(self.root, height=9, width=70, font=("Arial", "8"))
         self.log_widget.pack()
@@ -232,6 +238,7 @@ class Application(tk.Frame):
 
         self.canvas.create_text(150, 80, text="Find objects using CV and set\nthem to respected starting positions", font=("Arial", 12))
         self.canvas.create_window(80, 120, window=self.button1)
+        self.canvas.create_window(230, 120, window=self.button6)
 
         self.canvas.create_text(110, 160, text="Insert object into the box", font=("Arial", 12))
         self.canvas.create_window(80, 190, window=self.button2)
@@ -288,7 +295,7 @@ class Application(tk.Frame):
     ########################################################################################
     # Button functions
     def find_objects(self, event):
-        print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding objects")
+        print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding object")
 
         ret, frame = self.cap.read()
         
@@ -304,16 +311,37 @@ class Application(tk.Frame):
             # Find contours 
             contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
 
+            # Sort contours by area size
             sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-            packaging_contour = sorted_contours[0]
-            counter_contour = sorted_contours[2]
+            # Calculate moments and define center of contour
+            M = cv2.moments(sorted_contours[0])
+            cx = int(M['m10']/M['m00'])
+            cy = int(M['m01']/M['m00'])
+            cv2.circle(frame, (cx, cy), 7, (255, 0, 0), -1)
 
-            # Draw all contours
-            cv2.drawContours(frame, [packaging_contour, counter_contour], -1, (0, 255, 0), 3)
+            x,y,w,h = cv2.boundingRect(sorted_contours[0])
+            cv2.rectangle(frame, (x,y), (x+w, y+h), (0,255,0), 2)
 
-            cv2.imshow("Frame", frame)
-            cv2.waitKey(0)
+            
+            # Resize image
+            width, height = frame.shape[:2]
+            resized_image = cv2.resize(frame, (int(width/1.5), int(height/2)))
+            
+            # Display image and wait for user to see where the center is
+            img = Image.fromarray(resized_image)
+            imgtk = ImageTk.PhotoImage(image=img)
+            self.canvas.create_image(450, 30, image=imgtk, anchor=tk.NW)
+            self.root.update()
+            time.sleep(3)  
+
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Found object")
+ 
+
+    def grab_object(self, event):
+        #TODO: Cnvert cordinate system and grab the box
+        pass
+
 
             
 
@@ -379,7 +407,7 @@ class Application(tk.Frame):
                     pass
             else:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 600, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1000, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
 
@@ -401,7 +429,7 @@ class Application(tk.Frame):
                     pass
             else:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 600, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1000, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
 
