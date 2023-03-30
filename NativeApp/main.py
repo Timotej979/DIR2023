@@ -1,4 +1,4 @@
-import cv2, time, sys, os, csv
+import cv2, time, sys, os, csv, math
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,29 @@ from dotenv import load_dotenv
 
 ########################################################################################
 # Point cloud
+
+LOWER_SPEED_TOCKE = [
+    #'Skatlja_odpiranje_zacetek',
+    'Skatlja_odpiranje_posevno',
+    'Skatlja_odpiranje_posevno_popravek',
+    'Skatlja_odpiranje_konec',
+    'Skatlja_vstavljanje_zacetek',
+    'Skatlja_potisk_koncna',
+    'Stevec_v_skatlji_potisk_koncna',
+    'Zacetek_odlaganja_X',
+    'Odlaganje_X',
+    'Zacetek_odlaganja_X_rotiran',
+    'Odlaganje_X_rotiran',
+    'Zacetek_odlaganja_Y',
+    'Odlaganje_Y',
+    'Zacetek_odlaganja_Y_rotiran',
+    'Odlaganje_Y_rotiran',
+    'Stevec_prehodna',
+    'Zacetek_odlaganja_Z',
+    'Odlaganje_Z',
+    'Zacetek_odlaganja_Z_rotiran',
+    'Odlaganje_Z_rotiran',
+]
 
 ZAPOREDJE_TOCK_SKATLJA = [
     'Skatlja_prehodna',
@@ -38,7 +61,6 @@ ZAPOREDJE_TOCK_SKATLJA = [
     'Skatlja_potisk_koncna',
     'Skatlja_prehod_po',
 ]
-
 
 ZAPOREDJE_TOCK_STEVEC = [
     'Stevec_prehodna',
@@ -78,16 +100,18 @@ ZAPOREDJE_TOCK_STEVEC = [
     'Stevec_spakiran_prehod',
 ]
 
-
 ZAPOREDJE_TOCK_PREPRIJEM_OZJI_ROB = [
     'Stevec_spakiran_obracanje',
     'Stevec_spakiran_ozji_bok_nad',
     'Stevec_spakiran_ozji_bok',
+    'suction_off',
     'Stevec_spakiran_preprijem_ozji_bok_prehod',
     'Stevec_spakiran_preprijem_ozji_bok_nad',
     'Stevec_spakiran_preprijem_ozji_bok_pred',
     'Stevec_spakiran_preprijem_ozji_bok',
-    'Stevec_spakiran_preprijem_ozji_bok_nad',
+    'suction_on',
+    'Stevec_spakiran_preprijem_ozji_bok_nad_po',
+    'Odlaganje_X_prehodna',
 ]
 
 ZAPOREDJE_TOCK_PREPRIJEM_DALJSI_ROB = [
@@ -97,11 +121,13 @@ ZAPOREDJE_TOCK_PREPRIJEM_DALJSI_ROB = [
     'Stevec_spakiran_daljsi_bok_pred',
     'Stevec_spakiran_daljsi_bok_pred1',
     'Stevec_spakiran_daljsi_bok',
+    'suction_off',
     'Stevec_spakiran_preprijem_daljsi_bok_prehod',
     'Stevec_spakiran_preprijem_daljsi_bok_pred',
     'Stevec_spakiran_preprijem_daljsi_bok_nad',
     'Stevec_spakiran_preprijem_daljsi_bok_nad1',
     'Stevec_spakiran_preprijem_daljsi_bok',
+    'suction_on',
     'Stevec_spakiran_preprijem_daljsi_bok_nad_po',
 ]
 
@@ -111,8 +137,18 @@ ZAPOREDJE_TOCK_ODLAGANJE_DALJSI_ROB =[]
 
 TOCKE_ZACETKA_ODALAGANJA = [
     'Zacetek_odlaganja_X',
+    'Odlaganje_X',
+    'Zacetek_odlaganja_X_rotiran',
+    'Odlaganje_X_rotiran',
     'Zacetek_odlaganja_Y',
-    'Zacetek_odlaganja_Z'
+    'Odlaganje_Y',
+    'Zacetek_odlaganja_Y_rotiran',
+    'Odlaganje_Y_rotiran',
+    'Stevec_prehodna',
+    'Zacetek_odlaganja_Z',
+    'Odlaganje_Z',
+    'Zacetek_odlaganja_Z_rotiran',
+    'Odlaganje_Z_rotiran',
 ]
 
 
@@ -150,6 +186,232 @@ class Console(tk.Text):
     def reset(self, event):
         sys.stdout = self.old_stdout
 
+class PackingTest():
+    def __init__(self):
+        self.packingX_offs_x = 9000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingX_offs_y = 18000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingY_offs_x = 9000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingY_offs_y = 25000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingZ_offs_x = 18000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingZ_offs_y = 25000 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.package_num = 0 #zaporedna stevilka zapakiranega stevca
+    
+    def next_packing_pos(self, orientation, robot):
+        '''
+            Odlozi stevec na paleto.
+
+                -orientation: izbrana orientacija ('X','Y','Z')
+                -robot: objekt robot
+        '''
+
+        # premikanje po točkah
+        path = '~/Documents/DIR2023/NativeApp/points_data'
+
+        #sharnjene točke
+        positions = pd.read_csv(path + '/positions.csv',index_col=0)
+
+
+        pos = [0,0,0,0,0,0,0]
+        if orientation == 'X':
+            if self.package_num <= 54:
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[0]].values
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 9
+                y_idx = self.package_num // 9
+
+                pos1[0] += x_idx*self.packingX_offs_x
+                pos1[1] += y_idx*self.packingX_offs_y
+                #na pozicijo nad odlogom
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[1]].values
+                pos2[0] += x_idx*self.packingX_offs_x
+                pos2[1] += y_idx*self.packingX_offs_y
+                #na pozicijo odloga
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+            elif self.package_num <= 58:
+                #zadnja vrstica z drugacno orientacijo
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[2]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[3]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                # x_idx = self.package_num - 54
+
+                # pos[0] += x_idx*self.packingX_offs_y
+                # pos[1] += 
+        elif orientation == 'Y':
+            if self.package_num <= 36:
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[4]].values
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 9
+                y_idx = self.package_num // 9
+
+                pos1[0] += x_idx*self.packingY_offs_x
+                pos1[1] += y_idx*self.packingY_offs_y
+                #na pozicijo nad odlogom
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[5]].values
+                pos2[0] += x_idx*self.packingY_offs_x
+                pos2[1] += y_idx*self.packingY_offs_y
+                #na pozicijo nad odlogom
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+
+            elif self.package_num <= 42:
+                #zadnja vrstica z drugacno orientacijo
+
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[6]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[7]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                # x_idx = (self.package_num - 36) % 3
+                # y_idx = (self.package_num - 36) // 3
+
+                # pos[0] += x_idx*self.packingY_offs_y - 0.5*self.packingY_offs_x + 0.5*self.packingY_offs_y
+                # pos[1] += 3.5*self.packingY_offs_y + y_idx*self.packingY_offs_x + 0.5*self.packingY_offs_x
+                # #NUJNO DODAJ OFFS ZA ROTACIJO ZA 90 STOPINJ!!!!!!
+                # pos[5] += 0
+        elif orientation == 'Z':
+            if self.package_num <= 16:
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[8]].values
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 4
+                y_idx = self.package_num // 4
+
+                pos1[0] += x_idx*self.packingZ_offs_x
+                pos1[1] += y_idx*self.packingZ_offs_y
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[9]].values
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 4
+                y_idx = self.package_num // 4
+
+                pos1[0] += x_idx*self.packingZ_offs_x
+                pos1[1] += y_idx*self.packingZ_offs_y
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[10]].values
+                pos2[0] += x_idx*self.packingZ_offs_x
+                pos2[1] += y_idx*self.packingZ_offs_y
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+            elif self.package_num <= 19:
+                #zadnja vrstica z drugacno orientacijo
+
+                pos1 = positions[TOCKE_ZACETKA_ODALAGANJA[11]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                
+                pos2 = positions[TOCKE_ZACETKA_ODALAGANJA[12]].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos2,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+                self.package_num += 1
+
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos1,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+                # x_idx = self.package_num - 16
+
+                # pos[0] += x_idx*self.packingZ_offs_y - 0.5*self.packingZ_offs_x + 0.5*self.packingZ_offs_y
+                # pos[1] += 3.5*self.packingZ_offs_y + 0.5*self.packingZ_offs_x
+                # #NUJNO DODAJ OFFS ZA ROTACIJO ZA 90 STOPINJ!!!!!!
+                # pos[5] += 0
+
+    def move_complete(self, robot):
+        # se se robot premika je vrednost TRUE drugace fallse 
+    
+        status = {}
+        if robot.ERROR_SUCCESS == robot.get_status(status):
+            if status['running'] != True:
+                return True
+            
+            else:
+                return False
+        return False
+
+
+
+
+
+
 
 # Application class
 class Application(tk.Frame):
@@ -158,15 +420,14 @@ class Application(tk.Frame):
     packing_string = None
     cap = None
 
-    def __init__(self):
+    cx1 = None
+    cx2 = None
+    cy1 = None
+    cy2 = None
 
-        self.packingX_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.packingX_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.packingY_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.packingY_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.packingZ_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.packingZ_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
-        self.package_num = 0 #zaporedna stevilka zapakiranega stevca
+    robot = robotComm.HC10('192.168.0.1')
+
+    def __init__(self):
 
         ########################################################################################
         self.root = tk.Tk()
@@ -313,15 +574,15 @@ class Application(tk.Frame):
 
             # Calculate moments and define center of contour
             M1 = cv2.moments(sorted_contours[0])
-            cx1 = int(M1['m10']/M1['m00'])
-            cy1 = int(M1['m01']/M1['m00'])
-            cv2.circle(frame, (cx1, cy1), 7, (255, 0, 0), -1)
+            Application.cx1 = int(M1['m10']/M1['m00'])
+            Application.cy1 = int(M1['m01']/M1['m00'])
+            cv2.circle(frame, (Application.cx1, Application.cy1), 7, (255, 0, 0), -1)
 
             # Calculate moments and define center of contour
             M2 = cv2.moments(sorted_contours[2])
-            cx2 = int(M2['m10']/M2['m00'])
-            cy2 = int(M2['m01']/M2['m00'])
-            cv2.circle(frame, (cx2, cy2), 7, (255, 0, 0), -1)
+            Application.cx2 = int(M2['m10']/M2['m00'])
+            Application.cy2 = int(M2['m01']/M2['m00'])
+            cv2.circle(frame, (Application.cx2, Application.cy2), 7, (255, 0, 0), -1)
 
             # Draw rectangle
             x1,y1,w1,h1 = cv2.boundingRect(sorted_contours[0])
@@ -336,22 +597,63 @@ class Application(tk.Frame):
             imgtk = ImageTk.PhotoImage(image=img)
             self.canvas.create_image(450, 30, image=imgtk, anchor=tk.NW)
             self.root.update()
-            time.sleep(3)  
+            time.sleep(2)  
 
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Found object")
  
+            self.mainloop()
 
     def grab_object(self, event):
-        #TODO: Cnvert cordinate system and grab the box
-        pass
+        # Convert cordinate system and grab the box
+        
+        # Scaling factor
+        factor = 0.54
 
+        # Points in pixels
+        cx1 = Application.cx1
+        cx2 = Application.cx2
+        cy1 = Application.cy1
+        cy2 = Application.cy2
+
+        # Calculate points in mm
+        x1 = cx1 * factor
+        x2 = cx2 * factor
+        y1 = cy1 * factor
+        y2 = cy2 * factor
+
+        ret, frame = Application.cap.read()
+
+        frame = frame[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
+
+        pixel_vector = np.array([[cx1, cy1], [cx2, cy2]])
+        robot_vector = np.array([[x1, y1], [x2, y2]])
+
+        pixel_qx = cx1 + math.cos(24*math.pi/180) * (cx2 - cx1) - math.sin(24*math.pi/180) * (cy2 - cy1)
+        pixel_qy = cy1 + math.sin(24*math.pi/180) * (cx2 - cx1) + math.cos(24*math.pi/180) * (cy2 - cy2)
+
+        robot_qx = x1 + math.cos(24*math.pi/180) * (x2 - x1) - math.sin(24*math.pi/180) * (y2 - y1)
+        robot_qy = y1 + math.sin(24*math.pi/180) * (x2 - x1) + math.cos(24*math.pi/180) * (y2 - y2)
+
+        pixel_vector_24 = np.array([[cx1, cy1], [pixel_qx, pixel_qy]])
+        robot_vector_24 = np.array([[x1, y1], [robot_qx, robot_qy]])
+
+        #cv2.line(frame, pixel_vector[0], pixel_vector[1], (255,0,0), 2)
+        cv2.line(frame, pixel_vector_24[0], pixel_vector_24[1], (255,0,0), 2)
+
+        cv2.imshow("Vec", frame)
+        cv2.waitKey(0)
+
+
+        #cv2.line(frame, (x1,y1), (x2,y2), (255,0,0), 2)
+        #rotated_vector = cv2.rotate(np.array([x1, x1+dx]), cv2.ROTATE_90_CLOCKWISE)
+        #cv2.line(frame, rotated_vector, (255,0,0), 2)
 
             
 
     def insert_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Inserting object")
 
-        robot = robotComm.HC10('192.168.0.1')
+        robot = Application.robot
 
         #incilizacija robota 
 
@@ -403,14 +705,14 @@ class Application(tk.Frame):
                 robot.select_job('GRIP_C')
                 robot.play_job()
                 time.sleep(1)
-            elif next_point == 'Stevec_prehodna_rotiran':
+            elif next_point in LOWER_SPEED_TOCKE:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 300, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
             else:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1000, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1200, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
 
@@ -425,14 +727,14 @@ class Application(tk.Frame):
                 robot.select_job('GRIP_C')
                 robot.play_job()
                 time.sleep(1)
-            elif next_point == 'Stevec_prehodna_rotiran':
+            elif next_point in LOWER_SPEED_TOCKE:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 300, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 500, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
             else:
                 pos = positions[next_point].values
-                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1000, pos,tool_no=0)
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 1200, pos,tool_no=0)
                 while(self.move_complete(robot=robot) != True):
                     pass
 
@@ -442,28 +744,26 @@ class Application(tk.Frame):
     def pack_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object")
 
-
-
+        robot = robotComm.HC10('192.168.0.1')
+        packer = PackingTest()
 
         # Check packaging string variable
         if Application.packing_string.get() == "X":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for X orientation")
 
-            drop_pos = self.next_packing_pos(orientation="X")
+            packer.next_packing_pos(orientation='X', robot=robot)
 
 
         elif Application.packing_string.get() == "Y":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Y orientation")
         
-            drop_pos = self.next_packing_pos(orientation="Y")
+            packer.next_packing_pos(orientation='Y', robot=robot)
 
 
         elif Application.packing_string.get() == "Z":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Z orientation")
         
-            drop_pos = self.next_packing_pos(orientation="Z")
-
-
+            packer.next_packing_pos(orientation='Z', robot=robot)
 
         else:
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Wrong packaging string")
@@ -544,7 +844,7 @@ class Application(tk.Frame):
     def stop_robot(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
 
-        robot = robotComm.HC10('192.168.0.1')
+        robot = Application.robot
 
         robot.switch_power(robot.POWER_TYPE_SERVO, robot.POWER_SWITCH_ON)
 
