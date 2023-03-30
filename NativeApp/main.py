@@ -109,6 +109,13 @@ ZAPOREDJE_TOCK_ODLAGANJE =[]
 ZAPOREDJE_TOCK_ODLAGANJE_OZJI_ROB =[]
 ZAPOREDJE_TOCK_ODLAGANJE_DALJSI_ROB =[]
 
+TOCKE_ZACETKA_ODALAGANJA = [
+    'Zacetek_odlaganja_X',
+    'Zacetek_odlaganja_Y',
+    'Zacetek_odlaganja_Z'
+]
+
+
 ########################################################################################
 # Load environment file
 load_dotenv()
@@ -149,7 +156,22 @@ class Application(tk.Frame):
 
     packing_string = None
 
+
+
+
+
+
     def __init__(self):
+
+        self.packingX_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingX_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingY_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingY_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingZ_offs_x = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.packingZ_offs_y = 5 #razlika med sosednjima točkama na paleti za orientacijo X
+        self.package_num = 0 #zaporedna stevilka zapakiranega stevca
+
+        ########################################################################################
         self.root = tk.Tk()
         self.root.title("Robotic sorter and packer")
         
@@ -328,7 +350,7 @@ class Application(tk.Frame):
         time.sleep(1)
 
         # premikanje po točkah
-        path = '~/Documents/DIR2023/points_data'
+        path = '~/Documents/DIR2023/NativeApp/points_data'
 
         #sharnjene točke
         positions = pd.read_csv(path + '/positions.csv',index_col=0)
@@ -389,24 +411,111 @@ class Application(tk.Frame):
     def pack_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object")
 
+
+
+
         # Check packaging string variable
         if Application.packing_string.get() == "X":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for X orientation")
 
+            drop_pos = self.next_packing_pos(orientation="X")
+
+
         elif Application.packing_string.get() == "Y":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Y orientation")
         
+            drop_pos = self.next_packing_pos(orientation="Y")
+
+
         elif Application.packing_string.get() == "Z":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Z orientation")
         
+            drop_pos = self.next_packing_pos(orientation="Z")
+
+
+
         else:
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Wrong packaging string")
+
+
+    def next_packing_pos(self, orientation):
+        '''
+            Vrni naslednjo pozicijo za odlaganje na paleto.
+
+                -orientation: izbrana orientacija ('X','Y','Z')
+        '''
+
+         # premikanje po točkah
+        path = '~/Documents/DIR2023/NativeApp/points_data'
+
+        #sharnjene točke
+        positions = pd.read_csv(path + '/positions.csv',index_col=0)
+
+        pos = [0,0,0,0,0,0,0]
+        if orientation == 'X':
+            pos = positions[TOCKE_ZACETKA_ODALAGANJA[0]].values
+            if self.package_num <= 54:
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 9
+                y_idx = self.package_num // 9
+
+                pos[0] += x_idx*self.packingX_offs_x
+                pos[1] += y_idx*self.packingX_offs_y
+            elif self.package_num <= 58:
+                #zadnja vrstica z drugacno orientacijo
+                x_idx = self.package_num - 54
+
+                pos[0] += x_idx*self.packingX_offs_y - 0.5*self.packingX_offs_x + 0.5*self.packingX_offs_y
+                pos[1] += 5.5*self.packingX_offs_y + 0.5*self.packingX_offs_x
+                #NUJNO DODAJ OFFS ZA ROTACIJO ZA 90 STOPINJ!!!!!!
+                pos[5] += 0
+        elif orientation == 'Y':
+            pos = positions[TOCKE_ZACETKA_ODALAGANJA[1]].values
+            if self.package_num <= 36:
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 9
+                y_idx = self.package_num // 9
+
+                pos[0] += x_idx*self.packingY_offs_x
+                pos[1] += y_idx*self.packingY_offs_y
+            elif self.package_num <= 42:
+                #zadnja vrstica z drugacno orientacijo
+                x_idx = (self.package_num - 36) % 3
+                y_idx = (self.package_num - 36) // 3
+
+                pos[0] += x_idx*self.packingY_offs_y - 0.5*self.packingY_offs_x + 0.5*self.packingY_offs_y
+                pos[1] += 3.5*self.packingY_offs_y + y_idx*self.packingY_offs_x + 0.5*self.packingY_offs_x
+                #NUJNO DODAJ OFFS ZA ROTACIJO ZA 90 STOPINJ!!!!!!
+                pos[5] += 0
+        elif orientation == 'Z':
+            pos = positions[TOCKE_ZACETKA_ODALAGANJA[2]].values
+            if self.package_num <= 16:
+                #zacetnih 6 vrstic po 9 stevcev
+                x_idx = self.package_num % 4
+                y_idx = self.package_num // 4
+
+                pos[0] += x_idx*self.packingZ_offs_x
+                pos[1] += y_idx*self.packingZ_offs_y
+            elif self.package_num <= 19:
+                #zadnja vrstica z drugacno orientacijo
+                x_idx = self.package_num - 16
+
+                pos[0] += x_idx*self.packingZ_offs_y - 0.5*self.packingZ_offs_x + 0.5*self.packingZ_offs_y
+                pos[1] += 3.5*self.packingZ_offs_y + 0.5*self.packingZ_offs_x
+                #NUJNO DODAJ OFFS ZA ROTACIJO ZA 90 STOPINJ!!!!!!
+                pos[5] += 0
+
+        return pos
 
 
 
 
     def stop_robot(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
+
+        robot = robotComm.HC10('192.168.0.1')
+
+        robot.switch_power(robot.POWER_TYPE_SERVO, robot.POWER_SWITCH_ON)
 
 
     def scan_qr(self, event):
@@ -425,10 +534,9 @@ class Application(tk.Frame):
                 if len(data) > 0:
                     print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Decoded Data : {}".format(data))
 
-                    with open('NativeApp/data.csv', 'w', newline='') as csvfile:
+                    with open('NativeApp/data.csv', 'a+', newline='\n') as csvfile:
                         writer = csv.writer(csvfile, delimiter=',')
-
-                        writer.writerow(["QR-code", str(data)])
+                        writer.writerow(["QR code: ", str(data)])
 
 
                 else:
