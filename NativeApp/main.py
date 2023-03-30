@@ -1,5 +1,11 @@
 import cv2, time, sys, os, csv
 
+import numpy as np
+import pandas as pd
+import time
+import lib.robot as robotComm
+
+
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 import numpy as np
@@ -7,6 +13,101 @@ import numpy as np
 from pyzbar.pyzbar import decode
 from PIL import Image, ImageTk
 from dotenv import load_dotenv
+
+
+########################################################################################
+# Point cloud
+
+ZAPOREDJE_TOCK_SKATLJA = [
+    'Skatlja_prehodna',
+    'Skatlja_pobiranje_zgoraj',
+    'Skatlja_pobiranje',
+    'suction_on',
+    'Skatlja_pobiranje_zgoraj_po',
+    'Skatlja_prehodna',
+    'Skatlja_odpiranje_zacetek',
+    'Skatlja_odpiranje_spodaj',
+    'Skatlja_odpiranje_posevno',
+    'Skatlja_odpiranje_posevno_popravek',
+    'Skatlja_odpiranje_konec',
+    'Skatlja_vstavljanje_zacetek',
+    'suction_off',
+    'Skatlja_vstavljanje_spust',
+    'Stevec_potisk_pred',
+    'Stevec_v_skatlji_potisk_pred_rotiran',
+    'Skatlja_potisk_koncna',
+    'Skatlja_prehod_po',
+]
+
+
+ZAPOREDJE_TOCK_STEVEC = [
+    'Stevec_prehodna',
+    'Pobiranje_stevca_zgoraj',
+    'Pobiranje_stevca',
+    'suction_on',
+    'Pobiranje_stevca_zgoraj',
+    'Stevec_prehodna',
+    'Stevec_prehodna_rotiran',
+    'Stevec_vstavljanje_pred',
+    'Stevec_vstavljanje_spust',
+    'suction_off',
+    'Stevec_potisk_pred1',
+    'Stevec_potisk_pred',
+    'Stevec_potisk_pred_rotiran',
+    'Stevec_potisnjen',
+    'Stevec_v_skatlji_pobiranje_pred',
+    'Stevec_v_skatlji_pobiranje_nad',
+    'Stevec_v_skatlji_pobiranje',
+    'suction_on',
+    'Stevec_v_skatlji_rotacija_spodaj',
+    'Stevec_v_skatlji_rotacija_pred',
+    'Stevec_v_skatlji_rotacija_polovicno',
+    'Stevec_v_skatlji_rotiran',
+    'Stevec_v_skatlji_vstavljanje_pred',
+    'suction_off',
+    #dodatna mal nad
+    'Stevec_potisk_pred',
+    'Stevec_potisk_pred_rotiran',
+    'Stevec_v_skatlji_potisk_pred_rotiran',
+    'Stevec_v_skatlji_potisk_koncna',
+    #dodat mal nazaj
+    'Stevec_v_skatlji_potisk_koncna_po',
+    'Stevec_spakiran_pobiranje_zgoraj',
+    'Stevec_spakiran_pobiranje',
+    'suction_on',
+    'Stevec_spakiran_prehod',
+]
+
+
+ZAPOREDJE_TOCK_PREPRIJEM_OZJI_ROB = [
+    'Stevec_spakiran_obracanje',
+    'Stevec_spakiran_ozji_bok_nad',
+    'Stevec_spakiran_ozji_bok',
+    'Stevec_spakiran_preprijem_ozji_bok_prehod',
+    'Stevec_spakiran_preprijem_ozji_bok_nad',
+    'Stevec_spakiran_preprijem_ozji_bok_pred',
+    'Stevec_spakiran_preprijem_ozji_bok',
+    'Stevec_spakiran_preprijem_ozji_bok_nad',
+]
+
+ZAPOREDJE_TOCK_PREPRIJEM_DALJSI_ROB = [
+    'Stevec_spakiran_obracanje',
+    'Stevec_spakiran_daljsi_bok_prehod',
+    'Stevec_spakiran_daljsi_bok_nad',
+    'Stevec_spakiran_daljsi_bok_pred',
+    'Stevec_spakiran_daljsi_bok_pred1',
+    'Stevec_spakiran_daljsi_bok',
+    'Stevec_spakiran_preprijem_daljsi_bok_prehod',
+    'Stevec_spakiran_preprijem_daljsi_bok_pred',
+    'Stevec_spakiran_preprijem_daljsi_bok_nad',
+    'Stevec_spakiran_preprijem_daljsi_bok_nad1',
+    'Stevec_spakiran_preprijem_daljsi_bok',
+    'Stevec_spakiran_preprijem_daljsi_bok_nad_po',
+]
+
+ZAPOREDJE_TOCK_ODLAGANJE =[]
+ZAPOREDJE_TOCK_ODLAGANJE_OZJI_ROB =[]
+ZAPOREDJE_TOCK_ODLAGANJE_DALJSI_ROB =[]
 
 ########################################################################################
 # Load environment file
@@ -42,8 +143,12 @@ class Console(tk.Text):
     def reset(self, event):
         sys.stdout = self.old_stdout
 
+
 # Application class
 class Application(tk.Frame):
+
+    packing_string = None
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Robotic sorter and packer")
@@ -68,11 +173,11 @@ class Application(tk.Frame):
         self.button2.bind("<Button-1>", self.insert_object)
 
         # Create a drop down menu
-        self.packing_string = tk.StringVar(self.root)
-        self.packing_string.set("X") # default value
+        Application.packing_string = tk.StringVar(self.root)
+        Application.packing_string.set("X") # default value
         self.options = ["X", "Y", "Z"]
 
-        self.drop_down = tk.OptionMenu(self.root, self.packing_string, *self.options)
+        self.drop_down = tk.OptionMenu(self.root, Application.packing_string, *self.options)
         self.drop_down.pack()
 
         self.button3 = tk.Button(self.root, text="Pack object")
@@ -123,14 +228,13 @@ class Application(tk.Frame):
         self.drop_down.place(x=20, y=242)
 
         # Open the webcam
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(1)
         self.cap.set(3, 1920) # Width
         self.cap.set(4, 1080) # Height
 
         # Check if the webcam is opened correctly
         if not self.cap.isOpened():
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Cannot open webcam")
-            self.update_label()
             sys.exit(1)
 
         self.mainloop()
@@ -194,11 +298,109 @@ class Application(tk.Frame):
     def insert_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Inserting object")
 
+        robot = robotComm.HC10('192.168.0.1')
+
+        #incilizacija robota 
+
+
+        info = {}
+        if robot.ERROR_SUCCESS == robot.acquire_system_info(robot.SystemInfoType.R1, info):
+            print("Robot version:")
+            print(info)
+            print("\n")
+            
+        if robot.ERROR_SUCCESS != robot.reset_alarm(robot.RESET_ALARM_TYPE_ALARM):
+            print("failed resetting alarms, err={}".format(hex(robot.errno)))
+            
+        if robot.switch_power(robot.POWER_TYPE_SERVO, robot.POWER_SWITCH_ON) > 1:
+            print("failed turning on servo power supply, err={}".format(hex(robot.errno)))
+
+        # 0x3450 
+        status = {}
+        try:
+            if robot.ERROR_SUCCESS == robot.get_status(status):
+                print("Robot status:")
+                print(status)
+                print("\n")
+        except:
+            pass
+
+        time.sleep(1)
+
+        # premikanje po točkah
+        path = '~/Documents/DIR2023/points_data'
+
+        #sharnjene točke
+        positions = pd.read_csv(path + '/positions.csv',index_col=0)
+        #preverjanje stanja servo motorjev
+        status = {}
+        if robot.ERROR_SUCCESS == robot.get_status(status):
+            if not status['servo_on']:
+                robot.switch_power(robot.POWER_TYPE_SERVO, robot.POWER_SWITCH_ON)
+
+        
+        for i in range(len(ZAPOREDJE_TOCK_SKATLJA)):
+            #pojdi čez vse točke
+            next_point = ZAPOREDJE_TOCK_SKATLJA[i]
+            if next_point == 'suction_on':
+                robot.select_job('GRIP_O')
+                robot.play_job()
+                time.sleep(1)
+            elif next_point == 'suction_off':
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+            elif next_point == 'Stevec_prehodna_rotiran':
+                pos = positions[next_point].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 300, pos,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+            else:
+                pos = positions[next_point].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 600, pos,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
+        for i in range(len(ZAPOREDJE_TOCK_STEVEC)):
+            #pojdi čez vse točke
+            next_point = ZAPOREDJE_TOCK_STEVEC[i]
+            if next_point == 'suction_on':
+                robot.select_job('GRIP_O')
+                robot.play_job()
+                time.sleep(1)
+            elif next_point == 'suction_off':
+                robot.select_job('GRIP_C')
+                robot.play_job()
+                time.sleep(1)
+            elif next_point == 'Stevec_prehodna_rotiran':
+                pos = positions[next_point].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 300, pos,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+            else:
+                pos = positions[next_point].values
+                robot.one_move(robot.MOVE_TYPE_LINEAR_ABSOLUTE_POS, robot.MOVE_COORDINATE_SYSTEM_BASE, robot.MOVE_SPEED_CLASS_MILLIMETER, 600, pos,tool_no=0)
+                while(self.move_complete(robot=robot) != True):
+                    pass
+
 
 
 
     def pack_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object")
+
+        # Check packaging string variable
+        if Application.packing_string.get() == "X":
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for X orientation")
+
+        elif Application.packing_string.get() == "Y":
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Y orientation")
+        
+        elif Application.packing_string.get() == "Z":
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Z orientation")
+        
+        else:
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Wrong packaging string")
 
 
 
@@ -240,7 +442,19 @@ class Application(tk.Frame):
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Couldn't read frame")
     
 
+    def move_complete(self, robot):
+        # se se robot premika je vrednost TRUE drugace fallse 
     
+        status = {}
+        if robot.ERROR_SUCCESS == robot.get_status(status):
+            if status['running'] != True:
+                return True
+            
+            else:
+                return False
+        return False
+
+
 
 ##########################################################################################################################################
 if __name__ == "__main__":
