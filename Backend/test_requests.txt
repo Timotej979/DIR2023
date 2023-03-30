@@ -1,6 +1,0 @@
-DB CONNECTION:
-    psql postgres://admin:DIRpassword@db:5432/DIRdatabase
-    psql postgres://admin:DIRpassword@127.0.0.1:6666/DIRdatabase
-
-HEALTHCHECK:
-curl http://127.0.0.1:5000/robotic-sorter-and-packer-api/v1/healthz
