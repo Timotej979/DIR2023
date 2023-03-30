@@ -154,12 +154,9 @@ class Console(tk.Text):
 # Application class
 class Application(tk.Frame):
 
+    # Global packaging string and video camera object
     packing_string = None
-
-
-
-
-
+    cap = None
 
     def __init__(self):
 
@@ -257,12 +254,12 @@ class Application(tk.Frame):
         self.drop_down.place(x=20, y=242)
 
         # Open the webcam
-        self.cap = cv2.VideoCapture(1)
-        self.cap.set(3, 1920) # Width
-        self.cap.set(4, 1080) # Height
+        Application.cap = cv2.VideoCapture(1)
+        Application.cap.set(3, 1920) # Width
+        Application.cap.set(4, 1080) # Height
 
         # Check if the webcam is opened correctly
-        if not self.cap.isOpened():
+        if not Application.cap.isOpened():
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Cannot open webcam")
             sys.exit(1)
 
@@ -270,16 +267,16 @@ class Application(tk.Frame):
 
     def __del__(self):
         # Release the camera and close the window
-        self.cap.release()
-        self.root.destroy()
-        sys.exit(0)
-
+        self.root.after(1000, self.root.destroy)
+        self.root.update()
+        Application.cap.release()
+        cv2.destroyAllWindows()
 
     ########################################################################################
     # Start the mainloop
     def mainloop(self):
         while True:
-            _, frame = self.cap.read()
+            _, frame = Application.cap.read()
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
             
@@ -297,7 +294,7 @@ class Application(tk.Frame):
     def find_objects(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding object")
 
-        ret, frame = self.cap.read()
+        ret, frame = Application.cap.read()
         
         if ret == True:
 
@@ -315,14 +312,20 @@ class Application(tk.Frame):
             sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
             # Calculate moments and define center of contour
-            M = cv2.moments(sorted_contours[0])
-            cx = int(M['m10']/M['m00'])
-            cy = int(M['m01']/M['m00'])
-            cv2.circle(frame, (cx, cy), 7, (255, 0, 0), -1)
+            M1 = cv2.moments(sorted_contours[0])
+            cx1 = int(M1['m10']/M1['m00'])
+            cy1 = int(M1['m01']/M1['m00'])
+            cv2.circle(frame, (cx1, cy1), 7, (255, 0, 0), -1)
 
-            x,y,w,h = cv2.boundingRect(sorted_contours[0])
-            cv2.rectangle(frame, (x,y), (x+w, y+h), (0,255,0), 2)
+            # Calculate moments and define center of contour
+            M2 = cv2.moments(sorted_contours[2])
+            cx2 = int(M2['m10']/M2['m00'])
+            cy2 = int(M2['m01']/M2['m00'])
+            cv2.circle(frame, (cx2, cy2), 7, (255, 0, 0), -1)
 
+            # Draw rectangle
+            x1,y1,w1,h1 = cv2.boundingRect(sorted_contours[0])
+            cv2.rectangle(frame, (x1,y1), (x1+w1, y1+h1), (0,255,0), 2)
             
             # Resize image
             width, height = frame.shape[:2]
