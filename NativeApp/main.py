@@ -449,11 +449,7 @@ class PackingTest():
             else:
                 return False
         return False
-
-
-
-
-
+    
 
 ########################################################################################################################################################
 # Application class
@@ -593,8 +589,8 @@ class Application(tk.Frame):
             self.canvas.create_image(450, 30, image=imgtk, anchor=tk.NW)
             self.root.update()   
 
-    ########################################################################################
-    # Button functions
+    #########################################################################################
+    ############################# Button functions ##########################################
     def find_objects(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Finding object")
 
@@ -699,17 +695,14 @@ class Application(tk.Frame):
         #cv2.line(frame, (x1,y1), (x2,y2), (255,0,0), 2)
         #rotated_vector = cv2.rotate(np.array([x1, x1+dx]), cv2.ROTATE_90_CLOCKWISE)
         #cv2.line(frame, rotated_vector, (255,0,0), 2)
-
-            
+        #      
 
     def insert_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Inserting object")
 
-
-
         robot = Application.robot
 
-        #incilizacija robota 
+        # Initialize robot 
 
         info = {}
         if robot.ERROR_SUCCESS == robot.acquire_system_info(robot.SystemInfoType.R1, info):
@@ -735,12 +728,12 @@ class Application(tk.Frame):
 
         time.sleep(1)
 
-        # premikanje po točkah
+        # Move by points in a directory
         path = '~/Documents/DIR2023/NativeApp/points_data'
 
-        #sharnjene točke
+        # Read points from file
         positions = pd.read_csv(path + '/positions.csv',index_col=0)
-        #preverjanje stanja servo motorjev
+        # Check servo motor states
         status = {}
         if robot.ERROR_SUCCESS == robot.get_status(status):
             if not status['servo_on']:
@@ -748,7 +741,7 @@ class Application(tk.Frame):
 
         
         for i in range(len(ZAPOREDJE_TOCK_SKATLJA)):
-            #pojdi čez vse točke
+            # Go over all points
             next_point = ZAPOREDJE_TOCK_SKATLJA[i]
             if next_point == 'suction_on':
                 robot.select_job('GRIP_O')
@@ -773,7 +766,7 @@ class Application(tk.Frame):
         self.root.update() 
 
         for i in range(len(ZAPOREDJE_TOCK_STEVEC)):
-            #pojdi čez vse točke
+            # Go over all points
             next_point = ZAPOREDJE_TOCK_STEVEC[i]
             if next_point == 'suction_on':
                 robot.select_job('GRIP_O')
@@ -794,9 +787,6 @@ class Application(tk.Frame):
                 while(self.move_complete(robot=robot) != True):
                     pass
 
-
-
-
     def pack_object(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object")
 
@@ -806,19 +796,14 @@ class Application(tk.Frame):
         # Check packaging string variable
         if Application.packing_string.get() == "X":
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for X orientation")
-
             packer.next_packing_pos(orientation='X', robot=robot)
 
-
         elif Application.packing_string.get() == "Y":
-            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Y orientation")
-        
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Y orientation")     
             packer.next_packing_pos(orientation='Y', robot=robot)
 
-
         elif Application.packing_string.get() == "Z":
-            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Z orientation")
-        
+            print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Packing object for Z orientation")        
             packer.next_packing_pos(orientation='Z', robot=robot)
 
         else:
@@ -826,25 +811,19 @@ class Application(tk.Frame):
 
     def stop_robot(self, event):
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Stopping")
-
         robot = Application.robot
-
         robot.switch_power(robot.POWER_TYPE_SERVO, robot.POWER_SWITCH_ON)
-
 
     def scan_qr(self, event):
         
         ret, frame = self.cap.read()
         
         if ret == True:
-
             # Cut off edeges of the image
             frame = frame[START_CUT_IMAGE_Y:END_CUT_IMAGE_Y, START_CUT_IMAGE_X:END_CUT_IMAGE_X]
-
             try:
                 # Find QR code
                 data, bbox, rectifiedImage = cv2.QRCodeDetector().detectAndDecode(frame)
-                
                 if len(data) > 0:
                     print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Decoded Data : {}".format(data))
 
@@ -854,7 +833,6 @@ class Application(tk.Frame):
                             last_line = None
                             for line in reader:
                                 last_line = line
-
                             if int(data.replace(" ", "")) - int(last_line[0].replace(" ", "")) != 1:
                                 print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Error: Detected wrong ID")
                     except:
@@ -870,19 +848,15 @@ class Application(tk.Frame):
         else:
             print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " +"Couldn't read frame")
     
-
     def move_complete(self, robot):
-        # se se robot premika je vrednost TRUE drugace fallse 
-    
+        # If robot is moving, value is TRUE, otherwise FALSE 
         status = {}
         if robot.ERROR_SUCCESS == robot.get_status(status):
             if status['running'] != True:
                 return True
-            
             else:
                 return False
         return False
-
 
 
 ##########################################################################################################################################
@@ -895,7 +869,5 @@ if __name__ == "__main__":
     else:
         print(time.strftime("[ %H:%M:%S", time.localtime()) + "." + str(int(time.time() * 1000) % 1000).zfill(3) + " ]  " + "Error: Couldn't get OPERATION mode from environment file, please set it")
 
-
-    # Create the application
+    # Create the application and run it
     app = Application()
-    
