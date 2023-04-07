@@ -9,5 +9,5 @@ Proof of concept hackaton "Days of industrial robotics 2023" application for con
 * Stop robot - Stops the robot (Half way implemented)
 * Scan QR - Scans the QR code and if the serial number is not in order prints an error
 
-![image](https://github.com/Timotej979/DIR2023/docs/assets/robot1.jpg)
-![image](https://github.com/Timotej979/DIR2023/docs/assets/robot2.jpg)
+![image](https://github.com/Timotej979/DIR2023/tree/main/docs/assests/robot1.jpg)
+![image](https://github.com/Timotej979/DIR2023/tree/main/docs/assests/robot2.jpg)
