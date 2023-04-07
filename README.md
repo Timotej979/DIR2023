@@ -8,3 +8,6 @@ Proof of concept hackaton "Days of industrial robotics 2023" application for con
 * Pack object - Packs the product in folded cardboard box and places it on a pallet by specification (Half-way implemented, not working in app, works standalone)
 * Stop robot - Stops the robot (Half way implemented)
 * Scan QR - Scans the QR code and if the serial number is not in order prints an error
+
+![image](/docs/assets/robot1.jpg)
+![image](/docs/assets/robot2.jpg)
